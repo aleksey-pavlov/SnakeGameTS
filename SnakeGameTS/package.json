@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@microsoft/signalr": "^6.0.10",
-    "@types/node": "^18.11.9"
+    "@types/node": "^18.11.9",
+    "@types/webpack": "^5.28.5"
   }
 }

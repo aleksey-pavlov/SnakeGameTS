@@ -1,7 +1,9 @@
-﻿const path = require("path");
+﻿/// <binding ProjectOpened='Watch - Development' />
+const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const webpack = require("webpack");
 
 module.exports = {
     entry: "./src/index.ts",
@@ -25,6 +27,7 @@ module.exports = {
             },
         ],
     },
+    devtool: "source-map",
     plugins: [
         new CleanWebpackPlugin(),
         new HtmlWebpackPlugin({
@@ -33,5 +36,10 @@ module.exports = {
         new MiniCssExtractPlugin({
             filename: "css/[name].[chunkhash].css",
         }),
-    ],
+        new webpack.SourceMapDevToolPlugin({
+            filename: "[file].map",
+            fallbackModuleFilenameTemplate: '[absolute-resource-path]',
+            moduleFilenameTemplate: '[absolute-resource-path]'
+        })
+    ]
 };

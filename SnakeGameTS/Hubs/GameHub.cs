@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using SnakeGameTS.Models;
 using SnakeGameTS.Services;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace SnakeGameTS.Hubs
@@ -11,33 +10,30 @@ namespace SnakeGameTS.Hubs
     {
         IGameService Game;
 
-        public GameHub(IGameService game) : base()
+        public GameHub(IGameService game, IHubContext<GameHub> _hubContext) : base()
         {
             if (game == null)
                 throw new NullReferenceException(nameof(game));
 
             Game = game;
+
+            Game.Subcsribe((food) => _hubContext.Clients.All.SendAsync("foodSync", food));
         }
 
-        public Task ControlCmd(long playerId, string cmd)
+        public async Task ControlCmd(long playerId, string cmd)
         {
-            Game.PlayerControlCmd(playerId, cmd);
+            var player = Game.PlayerControlCmd(playerId, cmd);
 
-            return Task.CompletedTask;
+            await Clients.All.SendAsync("playerSync", player);
         }
 
         public async Task GameStart(long playerId)
         {
             Game.JoinGame(playerId);
 
-            await Clients.All.SendAsync("playerConnectedSync", playerId);           
-        }
+            await Clients.Caller.SendAsync("syncGame", Game.GetSyncData());
 
-
-        public async Task Tick()
-        {           
-            var data = Game.GetSyncData();
-            await Clients.Caller.SendAsync("tick", data);
+            await Clients.All.SendAsync("playerConnectedSync", playerId);      
         }
     }
 }

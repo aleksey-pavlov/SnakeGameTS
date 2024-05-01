@@ -9,17 +9,22 @@ using System.Threading.Tasks;
 namespace SnakeGameTS.Services
 {
 
+    public delegate void FoodSyncAction(PositionDto data);
+
     public interface IGameService
     {
         void JoinGame(long playerId);
 
-        void PlayerControlCmd(long playerId, string cmd);
+        PlayerSyncDto PlayerControlCmd(long playerId, string cmd);
 
         void Tick();
 
         Task GameLoop();
 
         SyncDto GetSyncData();
+
+        void Subcsribe(FoodSyncAction call);
+
     }
 
     public class GameService : IGameService
@@ -31,11 +36,16 @@ namespace SnakeGameTS.Services
 
         IFood Food = new Food(20, 20, APP_WIDTH, APP_HEIGHT);
 
-        List<Delegate> Subscribers = new List<Delegate>();
+        FoodSyncAction FoodSync;
 
         public GameService()
         {
 
+        }
+
+        public void Subcsribe(FoodSyncAction call)
+        {
+            FoodSync = call;
         }
 
         public void JoinGame(long playerId)
@@ -44,16 +54,17 @@ namespace SnakeGameTS.Services
                 return;
 
             var snake = new Snake(20, 20, APP_WIDTH, APP_HEIGHT);
+
             player = new Player(snake);
 
             Players.Add(playerId, player);
                 
         }
 
-        public void PlayerControlCmd(long playerId, string cmd)
+        public PlayerSyncDto PlayerControlCmd(long playerId, string cmd)
         {
             if (!Players.TryGetValue(playerId, out var player))
-                return;
+                return null;
 
             var snake = player.GetSnake();
 
@@ -74,7 +85,13 @@ namespace SnakeGameTS.Services
                 case "ArrowRight":
                     snake.TurnRight();
                     break;
+
+                case "Move":
+                    snake.Move();
+                    break;
             }
+
+            return player.AsSyncDto(playerId);
         }
 
         public void Tick()
@@ -82,11 +99,16 @@ namespace SnakeGameTS.Services
             var foodPosition = Food.GetPosition();
 
             if (foodPosition.X == 0 && foodPosition.Y == 0)
+            {
                 Food.SetPosition(MathHelper.Random(20, APP_WIDTH - 20, 20), MathHelper.Random(20, APP_HEIGHT - 20, 20));
+                if (FoodSync != null)
+                {
+                    FoodSync(Food.GetPosition());
+                }
+            }
             
             foreach (var pair in Players)
             {
-                var playerId = pair.Key;
                 var player = pair.Value;
 
                 var snake = player.GetSnake();
@@ -119,8 +141,6 @@ namespace SnakeGameTS.Services
                     snake.Eat(Food);
                     player.ScoreInc();
                 }
-
-                snake.Move();
             }
         }
 

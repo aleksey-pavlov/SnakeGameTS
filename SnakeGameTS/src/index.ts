@@ -2,7 +2,7 @@
 import { Snake } from "./objects/Snake";
 import * as signalR from "@microsoft/signalr";
 import { Player } from "./objects/Player";
-import { SyncDto } from "./models/syncdto";
+import { SyncDto, PlayerSyncDto, FoodSyncDto } from "./models/syncdto";
 
 
 let clientPlayers: { [x: number]: Player } = {}
@@ -21,64 +21,6 @@ const server = new signalR.HubConnectionBuilder()
     .build();
 
 let food = new Food(20, 20);
-
-server.on("tick", (data: SyncDto) => {
-
-    ctx.clearRect(0, 0, APP_WIDTH, APP_HEIGHT);
-
-    food.sync(data.food);
-
-    if (food.x != 0 && food.y != 0)
-        food.draw(ctx);
-
-    for (let p in data.players) {
-
-        let syncPlayer = data.players[p];
-        let playerId = syncPlayer.id;
-
-        let clientPlayer = clientPlayers[playerId];
-        clientPlayer.sync(syncPlayer);
-
-        //if (clientPlayer.isGameOver && currentPlayerId == playerId)
-          //  GameOver();
-
-        clientPlayer.snake.draw(ctx);
-    }
-    
-    drawScore();
-
-    setTimeout(() => server.send("tick"), 150);
-});
-
-server.start().then(async () => {
-    await server.send("gameStart", currentPlayerId);
-
-    server.send("tick")
-
-    document.onkeyup = (e) => {
-        switch (e.code) {
-            case "ArrowUp":
-                server.send("controlCmd", currentPlayerId, "ArrowUp");
-                break;
-
-            case "ArrowDown":
-                server.send("controlCmd", currentPlayerId, "ArrowDown");
-                break;
-
-            case "ArrowLeft":
-                server.send("controlCmd", currentPlayerId, "ArrowLeft");
-                break;
-
-            case "ArrowRight":
-                server.send("controlCmd", currentPlayerId, "ArrowRight");
-                break;
-        }
-    }
-});
-
-server.on("playerConnectedSync", (playerId) => {
-    clientPlayers[playerId] = new Player(new Snake(20, 20));
-});
 
 
 function GameOver() {
@@ -102,3 +44,87 @@ function drawScore() {
     let scoreEl = document.getElementById("score");
     scoreEl.innerHTML = JSON.stringify(clientPlayers);
 }
+
+function createPlayer(playerId: number) {
+
+    let player = new Player(new Snake(20, 20));
+
+    clientPlayers[playerId] = player;
+
+    player.snake.draw(ctx);
+
+    console.log(`Connected player ${playerId}`);
+}
+
+function playerSync(player: PlayerSyncDto) {
+
+    let playerId = player.id;
+
+    if (!clientPlayers[playerId])
+        createPlayer(playerId);
+
+    let clientPlayer = clientPlayers[playerId];
+    clientPlayer.sync(player);
+
+    if (clientPlayer.isGameOver && currentPlayerId == playerId)
+        GameOver();
+
+    clientPlayer.snake.draw(ctx);
+
+    drawScore();
+}
+
+function foodSync(data: FoodSyncDto) {
+
+    food.sync(data);
+
+    if (food.x != 0 && food.y != 0)
+        food.draw(ctx);
+}
+
+function syncGame(data: SyncDto) {
+
+    foodSync(data.food);
+
+    for (let p in data.players) {
+        playerSync(data.players[p]);
+    }    
+}
+
+server.on("syncGame", (data: SyncDto) => syncGame(data));
+
+server.on("playerSync", (player: PlayerSyncDto) => playerSync(player));
+
+server.on("playerConnectedSync", (playerId: number) => createPlayer(playerId));
+
+server.on("foodSync", (data: FoodSyncDto) => foodSync(data));
+
+
+server.start().then(async () => {
+
+    await server.send("gameStart", currentPlayerId);
+
+    document.onkeyup = (e) => {
+        switch (e.code) {
+            case "ArrowUp":
+                server.send("controlCmd", currentPlayerId, "ArrowUp");
+                break;
+
+            case "ArrowDown":
+                server.send("controlCmd", currentPlayerId, "ArrowDown");
+                break;
+
+            case "ArrowLeft":
+                server.send("controlCmd", currentPlayerId, "ArrowLeft");
+                break;
+
+            case "ArrowRight":
+                server.send("controlCmd", currentPlayerId, "ArrowRight");
+                break;
+
+            case "Space":
+                server.send("controlCmd", currentPlayerId, "Move");
+                break;
+        }
+    }
+}).catch(err => document.write(err));
