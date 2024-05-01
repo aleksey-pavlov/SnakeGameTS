@@ -33,7 +33,7 @@ namespace SnakeGameTS.Hubs
 
             await Clients.Caller.SendAsync("syncGame", Game.GetSyncData());
 
-            await Clients.All.SendAsync("playerConnectedSync", playerId);      
+            await Clients.Others.SendAsync("playerConnectedSync", playerId);      
         }
     }
 }
